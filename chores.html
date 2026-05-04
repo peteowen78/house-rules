@@ -307,6 +307,24 @@
       cursor: default;
     }
     .chore-card.done .chore-title { text-decoration: line-through; }
+    .chore-card.cooling {
+      opacity: 0.45;
+      pointer-events: none;
+      cursor: default;
+      background: var(--surface);
+    }
+    .chore-card.cooling .chore-title { text-decoration: line-through; }
+    .chore-reset-badge {
+      margin-top: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
     .chore-card.taken { opacity: 0.45; pointer-events: none; cursor: default; }
     .chore-done-badge {
       margin-top: auto;
@@ -932,6 +950,29 @@
     }
     .role-opt.active { background: var(--yellow); color: #000; }
 
+    .repeat-picker {
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+    }
+    .repeat-opt {
+      flex: 1;
+      padding: 11px 6px;
+      border-radius: 0;
+      border: none;
+      background: var(--surface);
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+    .repeat-opt.active { background: var(--yellow); color: #000; }
+
     /* ── Phosphor icon alignment ── */
     i[class*="ph-"] { vertical-align: -0.13em; line-height: 1; }
     .icon-btn i[class*="ph-"] { font-size: 1rem; }
@@ -1118,12 +1159,14 @@
         <label>Points</label>
         <input type="number" id="chore-inp-pts" placeholder="10" min="1" inputmode="numeric" />
       </div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Repeating chore</div>
-          <div class="toggle-sub">Reappears on the board after completion</div>
+      <div class="field">
+        <label>Repeat</label>
+        <div class="repeat-picker" id="chore-repeat-picker">
+          <button type="button" class="repeat-opt active" data-interval="">Never</button>
+          <button type="button" class="repeat-opt" data-interval="daily">Daily</button>
+          <button type="button" class="repeat-opt" data-interval="weekly">Weekly</button>
+          <button type="button" class="repeat-opt" data-interval="monthly">Monthly</button>
         </div>
-        <div class="toggle" id="chore-repeating-toggle"></div>
       </div>
       <div class="field" style="margin-top:14px">
         <label>Assign to</label>
@@ -1352,11 +1395,15 @@ function renderChoreboard(kidId) {
     const mine = myActiveBychore[id];
     const done = myDoneBychore[id];
     const taken = takenByOther.has(id);
+    const cooling = ch.nextAvailableAt && Date.now() < ch.nextAvailableAt;
 
     let stateClass = 'available';
     let extra = '';
 
-    if (done) {
+    if (cooling) {
+      stateClass = 'cooling';
+      extra = `<span class="chore-reset-badge"><i class="ph-bold ph-clock-countdown"></i> ${formatResetTime(ch.nextAvailableAt)}</span>`;
+    } else if (done) {
       stateClass = 'done';
       extra = `<span class="chore-done-badge"><i class="ph-bold ph-check-circle"></i> Done</span>`;
     } else if (mine) {
@@ -1444,7 +1491,10 @@ function markChoreDone(claimId, kidId) {
     if (chore) {
       member.points = (member.points || 0) + chore.points;
       saveToFirebase('kids/' + kidId + '/points', member.points);
-      if (chore.repeating) {
+      const interval = chore.repeatInterval || (chore.repeating ? 'daily' : null);
+      if (interval && REPEAT_INTERVALS[interval]) {
+        chore.nextAvailableAt = Date.now() + REPEAT_INTERVALS[interval];
+        saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
         delete state.claims[claimId];
         saveToFirebase('claims/' + claimId, null);
       }
@@ -1565,9 +1615,11 @@ function approveChore(claimId) {
   saveToFirebase('kids/' + claim.kidId + '/points', kid.points);
   claim.status = 'approved';
   saveToFirebase('claims/' + claimId, claim);
-  // Reset repeating chores
-  if (chore.repeating) {
-    // Remove claim so chore becomes available again
+  // Reset repeating chores with interval cooldown
+  const interval = chore.repeatInterval || (chore.repeating ? 'daily' : null);
+  if (interval && REPEAT_INTERVALS[interval]) {
+    chore.nextAvailableAt = Date.now() + REPEAT_INTERVALS[interval];
+    saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
     delete state.claims[claimId];
     saveToFirebase('claims/' + claimId, null);
   }
@@ -1638,7 +1690,7 @@ function renderChoresMgmt() {
       <div class="mgmt-emoji">${renderIcon(ch.emoji)}</div>
       <div class="mgmt-info">
         <div class="mgmt-name">${esc(ch.title)}</div>
-        <div class="mgmt-sub"><i class="ph-bold ph-star"></i> ${ch.points} pts ${ch.repeating ? '· <i class="ph-bold ph-arrows-clockwise"></i> repeating' : ''}${ch.assignedTo && state.kids[ch.assignedTo] ? ' · <i class="ph-bold ph-user"></i> ' + esc(state.kids[ch.assignedTo].name) : ''}</div>
+        <div class="mgmt-sub"><i class="ph-bold ph-star"></i> ${ch.points} pts ${(ch.repeatInterval || ch.repeating) ? '· <i class="ph-bold ph-arrows-clockwise"></i> ' + (ch.repeatInterval || 'daily') : ''}${ch.assignedTo && state.kids[ch.assignedTo] ? ' · <i class="ph-bold ph-user"></i> ' + esc(state.kids[ch.assignedTo].name) : ''}</div>
       </div>
       <div class="mgmt-actions">
         <button class="icon-btn" data-edit-chore="${id}"><i class="ph-bold ph-pencil-simple"></i></button>
@@ -1834,8 +1886,21 @@ function deleteKid(id) {
 // ── Chore modal ──────────────────────────────────────────────────────────────
 let editingChoreId = null;
 let choreSelIcon = 'broom';
-let choreRepeating = false;
+let choreRepeatInterval = ''; // '' = never, 'daily', 'weekly', 'monthly'
 let choreAssignedTo = null; // null = anyone
+
+const REPEAT_INTERVALS = { daily: 86400000, weekly: 604800000, monthly: 2592000000 };
+
+function formatResetTime(nextAvailableAt) {
+  const ms = nextAvailableAt - Date.now();
+  if (ms <= 0) return 'Ready';
+  const days = Math.floor(ms / 86400000);
+  const hours = Math.floor(ms / 3600000);
+  const mins = Math.floor(ms / 60000);
+  if (days >= 1) return `Resets in ${days}d`;
+  if (hours >= 1) return `Resets in ${hours}h`;
+  return `Resets in ${mins}m`;
+}
 
 function buildAssignPicker() {
   const picker = document.getElementById('chore-assign-picker');
@@ -1866,17 +1931,23 @@ function openChoreModal(choreId) {
   document.getElementById('chore-inp-name').value = ch ? ch.title : '';
   choreSelIcon = ch ? (ch.emoji || 'broom') : 'broom';
   document.getElementById('chore-inp-pts').value = ch ? ch.points : '';
-  choreRepeating = ch ? !!ch.repeating : false;
+  choreRepeatInterval = ch ? (ch.repeatInterval || (ch.repeating ? 'daily' : '')) : '';
   choreAssignedTo = ch ? (ch.assignedTo || null) : null;
-  document.getElementById('chore-repeating-toggle').className = 'toggle' + (choreRepeating ? ' on' : '');
+  document.querySelectorAll('#chore-repeat-picker .repeat-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.interval === choreRepeatInterval);
+  });
   buildIconPicker('chore-icon-grid', choreSelIcon, CHORE_ICONS, v => { choreSelIcon = v; });
   buildAssignPicker();
   document.getElementById('modal-chore').classList.add('open');
 }
 
-document.getElementById('chore-repeating-toggle').addEventListener('click', () => {
-  choreRepeating = !choreRepeating;
-  document.getElementById('chore-repeating-toggle').className = 'toggle' + (choreRepeating ? ' on' : '');
+document.getElementById('chore-repeat-picker').addEventListener('click', e => {
+  const btn = e.target.closest('.repeat-opt');
+  if (!btn) return;
+  choreRepeatInterval = btn.dataset.interval;
+  document.querySelectorAll('#chore-repeat-picker .repeat-opt').forEach(b =>
+    b.classList.toggle('active', b.dataset.interval === choreRepeatInterval)
+  );
 });
 document.getElementById('add-chore-btn').addEventListener('click', () => openChoreModal(null));
 document.getElementById('chore-modal-cancel').addEventListener('click', () => document.getElementById('modal-chore').classList.remove('open'));
@@ -1887,7 +1958,7 @@ document.getElementById('chore-modal-save').addEventListener('click', () => {
   const emoji = choreSelIcon || 'broom';
   const points = parseInt(document.getElementById('chore-inp-pts').value, 10);
   if (!title || !(points > 0)) { toast('Fill in all fields'); return; }
-  const data = { title, emoji, points, repeating: choreRepeating, assignedTo: choreAssignedTo || null };
+  const data = { title, emoji, points, repeatInterval: choreRepeatInterval || null, assignedTo: choreAssignedTo || null };
   if (editingChoreId) {
     state.chores[editingChoreId] = { ...state.chores[editingChoreId], ...data };
     saveToFirebase('chores/' + editingChoreId, state.chores[editingChoreId]);

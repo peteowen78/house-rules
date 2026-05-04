@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); echo \"$f\" | grep -q '/AI PROJECTS/chores/' && cd \"/Users/peteowen/Documents/•WORK/AI PROJECTS/chores\" && cp chores.html index.html && git add -A && git commit -m \"auto-deploy\" && git push 2>/dev/null || true",
+            "statusMessage": "Deploying to GitHub…",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
