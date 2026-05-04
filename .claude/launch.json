@@ -4,7 +4,7 @@
     {
       "name": "chore-champions",
       "runtimeExecutable": "/bin/sh",
-      "runtimeArgs": ["-c", "mkdir -p /tmp/chore-champions-serve; B='/Users/peteowen/Documents/\u2022WORK/AI PROJECTS/chores'; cp \"$B/chores.html\" /tmp/chore-champions-serve/index.html; cd /tmp && exec /usr/bin/python3 /tmp/chore_champions_server.py"],
+      "runtimeArgs": ["-c", "mkdir -p /tmp/chore-champions-serve; B='/Users/peteowen/Documents/•WORK/AI PROJECTS/chores'; cp \"$B/chores.html\" /tmp/chore-champions-serve/index.html; cd /tmp/chore-champions-serve && exec /usr/bin/python3 -m http.server 3458"],
       "port": 3458
     }
   ]
