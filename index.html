@@ -986,14 +986,132 @@
       70% { transform: scale(0.96); }
     }
     .bounce { animation: bounce 0.4s ease; }
+
+    /* ── Setup screen ── */
+    #screen-setup {
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      background: #000;
+    }
+    .setup-logo {
+      font-size: 3.4rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      color: var(--yellow);
+      line-height: 0.9;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .setup-tagline {
+      font-size: 0.7rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 48px;
+      text-align: center;
+    }
+    .setup-card {
+      background: #fff;
+      width: 100%;
+      max-width: 380px;
+      padding: 28px 24px 24px;
+    }
+    .setup-tabs {
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+      margin-bottom: 24px;
+    }
+    .setup-tab {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: var(--surface);
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      transition: background 0.1s, color 0.1s;
+    }
+    .setup-tab.active { background: #000; color: var(--yellow); }
+    .setup-btn {
+      width: 100%;
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--yellow);
+      color: #000;
+      border: none;
+      border-radius: 0;
+      font-family: var(--font);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+    }
+    .family-code-block {
+      background: var(--surface);
+      padding: 14px 16px;
+      margin-top: 16px;
+    }
+    .family-code-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .family-code-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--text);
+    }
+    .family-code-hint {
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 4px;
+      letter-spacing: 0.02em;
+    }
   </style>
 </head>
 <body>
 
   <canvas id="confetti-canvas"></canvas>
 
+  <!-- ── SETUP SCREEN ── -->
+  <div id="screen-setup" class="screen active">
+    <div class="setup-logo">House<br>Rules</div>
+    <div class="setup-tagline">Family chore tracker</div>
+    <div class="setup-card">
+      <div class="setup-tabs">
+        <button class="setup-tab active" id="setup-tab-create">Create family</button>
+        <button class="setup-tab" id="setup-tab-join">Join family</button>
+      </div>
+      <div id="setup-create-panel">
+        <div class="field">
+          <label>Your surname</label>
+          <input type="text" id="setup-surname" placeholder="e.g. Owen" autocomplete="off" autocapitalize="words" />
+        </div>
+        <button class="setup-btn" id="setup-create-btn">Create family →</button>
+      </div>
+      <div id="setup-join-panel" style="display:none">
+        <div class="field">
+          <label>Family code</label>
+          <input type="text" id="setup-join-code" placeholder="e.g. XK3M9Z" maxlength="6" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:0.15em;font-size:1.2rem" />
+        </div>
+        <button class="setup-btn" id="setup-join-btn">Join family →</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── HOME SCREEN ── -->
-  <div id="screen-home" class="screen active">
+  <div id="screen-home" class="screen">
     <div class="home-header">
       <div class="home-title">House Rules</div>
       <div class="home-sub">Who's playing today?</div>
@@ -1077,6 +1195,11 @@
             <div class="mgmt-sub">Current PIN is used to access Parent Mode</div>
           </div>
           <button class="icon-btn" id="change-pin-btn"><i class="ph-bold ph-pencil-simple"></i></button>
+        </div>
+        <div class="family-code-block">
+          <div class="family-code-label"><i class="ph-bold ph-users"></i> Family code</div>
+          <div class="family-code-value" id="family-code-display">——</div>
+          <div class="family-code-hint">Share this code so other devices can join your family</div>
         </div>
       </div>
     </div>
@@ -1250,8 +1373,23 @@ try {
   db = firebase.database();
 } catch(e) { console.warn('Firebase unavailable', e); }
 
-const DB_PATH = 'choreApp';
-function dbRef(path) { return db ? db.ref(DB_PATH + '/' + path) : null; }
+// ── Family management ────────────────────────────────────────────────────────
+function generateFamilyCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+let familyId   = localStorage.getItem('hrFamilyId')   || null;
+let familyName = localStorage.getItem('hrFamilyName') || '';
+
+function dbRef(path) {
+  if (!db || !familyId) return null;
+  const base = 'families/' + familyId;
+  return db.ref(path ? base + '/' + path : base);
+}
+
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -1269,17 +1407,34 @@ let activeKidId = null;
 
 // ── Firebase load ───────────────────────────────────────────────────────────
 function loadFromFirebase() {
-  if (!db) return;
+  if (!db || !familyId) return;
   dbRef('').on('value', snap => {
     const val = snap.val() || {};
+    familyName = val.name || familyName;
+    localStorage.setItem('hrFamilyName', familyName);
     state.kids        = val.kids        || {};
     state.chores      = val.chores      || {};
     state.claims      = val.claims      || {};
     state.prizes      = val.prizes      || {};
     state.redemptions = val.redemptions || {};
     state.settings    = val.settings    || { pin: '1234' };
+    // Update title + family code display
+    const title = familyName ? familyName + ' House Rules' : 'House Rules';
+    document.querySelector('.home-title').textContent = title;
+    document.title = title;
+    const codeEl = document.getElementById('family-code-display');
+    if (codeEl) codeEl.textContent = familyId;
     renderAll();
   });
+}
+
+function initApp() {
+  if (familyId) {
+    showScreen('home');
+    loadFromFirebase();
+  } else {
+    showScreen('setup');
+  }
 }
 
 function saveToFirebase(path, data) {
@@ -2131,8 +2286,50 @@ function timeAgo(ts) {
   return Math.floor(diff / 86400000) + 'd ago';
 }
 
+// ── Setup screen ─────────────────────────────────────────────────────────────
+document.getElementById('setup-tab-create').addEventListener('click', () => {
+  document.getElementById('setup-tab-create').classList.add('active');
+  document.getElementById('setup-tab-join').classList.remove('active');
+  document.getElementById('setup-create-panel').style.display = '';
+  document.getElementById('setup-join-panel').style.display = 'none';
+});
+document.getElementById('setup-tab-join').addEventListener('click', () => {
+  document.getElementById('setup-tab-join').classList.add('active');
+  document.getElementById('setup-tab-create').classList.remove('active');
+  document.getElementById('setup-join-panel').style.display = '';
+  document.getElementById('setup-create-panel').style.display = 'none';
+});
+
+document.getElementById('setup-create-btn').addEventListener('click', () => {
+  const surname = document.getElementById('setup-surname').value.trim();
+  if (!surname) { toast('Enter your surname'); return; }
+  familyId   = generateFamilyCode();
+  familyName = surname;
+  localStorage.setItem('hrFamilyId',   familyId);
+  localStorage.setItem('hrFamilyName', familyName);
+  // Save family name to Firebase
+  dbRef('name').set(familyName);
+  showScreen('home');
+  loadFromFirebase();
+});
+
+document.getElementById('setup-join-btn').addEventListener('click', () => {
+  const code = document.getElementById('setup-join-code').value.trim().toUpperCase();
+  if (code.length !== 6) { toast('Enter the 6-character family code'); return; }
+  // Check code exists in Firebase
+  db.ref('families/' + code).once('value', snap => {
+    if (!snap.exists()) { toast('Family code not found — check and try again'); return; }
+    familyId   = code;
+    familyName = snap.val().name || '';
+    localStorage.setItem('hrFamilyId',   familyId);
+    localStorage.setItem('hrFamilyName', familyName);
+    showScreen('home');
+    loadFromFirebase();
+  });
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────────
-loadFromFirebase();
+initApp();
 </script>
 </body>
 </html>
