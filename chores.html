@@ -995,6 +995,21 @@
       background: #000;
       overflow-y: auto;
     }
+    .landing-inner {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+    }
+    @media (min-width: 700px) {
+      #screen-setup {
+        padding: 60px 24px;
+      }
+      .landing-inner {
+        box-shadow: 0 0 0 1px #222;
+      }
+    }
     .landing-hero {
       padding: 56px 24px 36px;
       text-align: center;
@@ -1156,6 +1171,7 @@
 
   <!-- ── SETUP / LANDING SCREEN ── -->
   <div id="screen-setup" class="screen active">
+  <div class="landing-inner">
 
     <!-- Hero -->
     <div class="landing-hero">
@@ -1213,6 +1229,7 @@
 
     <div class="landing-footer">Free forever · No account needed · Works on any device</div>
 
+  </div><!-- /landing-inner -->
   </div>
 
   <!-- ── HOME SCREEN ── -->
