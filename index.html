@@ -987,36 +987,97 @@
     }
     .bounce { animation: bounce 0.4s ease; }
 
-    /* ── Setup screen ── */
+    /* ── Setup / Landing screen ── */
     #screen-setup {
-      align-items: center;
-      justify-content: center;
-      padding: 48px 24px;
+      align-items: stretch;
+      justify-content: flex-start;
+      padding: 0;
+      background: #000;
+      overflow-y: auto;
+    }
+    .landing-hero {
+      padding: 56px 24px 36px;
+      text-align: center;
       background: #000;
     }
     .setup-logo {
-      font-size: 3.4rem;
+      font-size: 3.8rem;
       font-weight: 700;
       letter-spacing: -0.04em;
       text-transform: uppercase;
       color: var(--yellow);
-      line-height: 0.9;
-      text-align: center;
-      margin-bottom: 10px;
+      line-height: 0.88;
+      margin-bottom: 20px;
     }
-    .setup-tagline {
-      font-size: 0.7rem;
-      letter-spacing: 0.18em;
+    .landing-desc {
+      font-size: 0.92rem;
+      color: #999;
+      line-height: 1.6;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+    .landing-features {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1px;
+      background: #222;
+      margin-top: 1px;
+    }
+    .landing-feature {
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .lf-white { background: #fff; color: #000; }
+    .lf-yellow { background: var(--yellow); color: #000; }
+    .lf-black { background: #111; color: #fff; }
+    .lf-icon { font-size: 1.8rem; line-height: 1; }
+    .lf-black .lf-icon { color: var(--yellow); }
+    .lf-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
       text-transform: uppercase;
-      color: #666;
-      margin-bottom: 48px;
-      text-align: center;
+      margin-top: 4px;
+    }
+    .lf-desc {
+      font-size: 0.82rem;
+      line-height: 1.55;
+      opacity: 0.7;
+    }
+    .landing-steps {
+      background: #000;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      border-top: 1px solid #222;
+    }
+    .landing-step {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .ls-num {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--yellow);
+      background: #1a1a1a;
+      padding: 6px 10px;
+      flex-shrink: 0;
+    }
+    .ls-text {
+      font-size: 0.82rem;
+      color: #888;
+      letter-spacing: 0.01em;
     }
     .setup-card {
       background: #fff;
       width: 100%;
-      max-width: 380px;
       padding: 28px 24px 24px;
+      border-top: 1px solid #222;
     }
     .setup-tabs {
       display: flex;
@@ -1054,6 +1115,15 @@
       letter-spacing: 0.1em;
       cursor: pointer;
     }
+    .landing-footer {
+      background: #000;
+      text-align: center;
+      padding: 24px;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #444;
+    }
     .family-code-block {
       background: var(--surface);
       padding: 14px 16px;
@@ -1084,10 +1154,42 @@
 
   <canvas id="confetti-canvas"></canvas>
 
-  <!-- ── SETUP SCREEN ── -->
+  <!-- ── SETUP / LANDING SCREEN ── -->
   <div id="screen-setup" class="screen active">
-    <div class="setup-logo">House<br>Rules</div>
-    <div class="setup-tagline">Family chore tracker</div>
+
+    <!-- Hero -->
+    <div class="landing-hero">
+      <div class="setup-logo">House<br>Rules</div>
+      <div class="landing-desc">Turn chores into a game your whole family actually wants to play. Kids earn points for every task — parents set the rules.</div>
+    </div>
+
+    <!-- Feature tiles -->
+    <div class="landing-features">
+      <div class="landing-feature lf-white">
+        <div class="lf-icon"><i class="ph-bold ph-list-checks"></i></div>
+        <div class="lf-title">Set the chores</div>
+        <div class="lf-desc">Daily, weekly or one-off tasks for the whole family or individual members.</div>
+      </div>
+      <div class="landing-feature lf-yellow">
+        <div class="lf-icon"><i class="ph-bold ph-star"></i></div>
+        <div class="lf-title">Earn points</div>
+        <div class="lf-desc">Every completed chore earns points. Parents approve — or set parents to auto-approve their own.</div>
+      </div>
+      <div class="landing-feature lf-black">
+        <div class="lf-icon"><i class="ph-bold ph-gift"></i></div>
+        <div class="lf-title">Claim prizes</div>
+        <div class="lf-desc">Spend points on rewards you set — screen time, days out, cash, anything.</div>
+      </div>
+    </div>
+
+    <!-- How it works strip -->
+    <div class="landing-steps">
+      <div class="landing-step"><span class="ls-num">01</span><span class="ls-text">Create your family in seconds</span></div>
+      <div class="landing-step"><span class="ls-num">02</span><span class="ls-text">Share the code with every device</span></div>
+      <div class="landing-step"><span class="ls-num">03</span><span class="ls-text">Add chores, prizes &amp; get going</span></div>
+    </div>
+
+    <!-- CTA card -->
     <div class="setup-card">
       <div class="setup-tabs">
         <button class="setup-tab active" id="setup-tab-create">Create family</button>
@@ -1108,6 +1210,9 @@
         <button class="setup-btn" id="setup-join-btn">Join family →</button>
       </div>
     </div>
+
+    <div class="landing-footer">Free forever · No account needed · Works on any device</div>
+
   </div>
 
   <!-- ── HOME SCREEN ── -->
