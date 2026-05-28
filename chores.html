@@ -1412,6 +1412,7 @@
         <label>Repeat</label>
         <div class="repeat-picker" id="chore-repeat-picker">
           <button type="button" class="repeat-opt active" data-interval="">Never</button>
+          <button type="button" class="repeat-opt" data-interval="instant">Instantly</button>
           <button type="button" class="repeat-opt" data-interval="daily">Daily</button>
           <button type="button" class="repeat-opt" data-interval="weekly">Weekly</button>
           <button type="button" class="repeat-opt" data-interval="monthly">Monthly</button>
@@ -1775,9 +1776,15 @@ function markChoreDone(claimId, kidId) {
       member.points = (member.points || 0) + chore.points;
       saveToFirebase('kids/' + kidId + '/points', member.points);
       const interval = chore.repeatInterval || (chore.repeating ? 'daily' : null);
-      if (interval && REPEAT_INTERVALS[interval]) {
-        chore.nextAvailableAt = Date.now() + REPEAT_INTERVALS[interval];
-        saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
+      if (interval !== null && interval in REPEAT_INTERVALS) {
+        if (interval === 'instant') {
+          // Reset immediately — clear any previous cooldown too
+          chore.nextAvailableAt = null;
+          saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', null);
+        } else {
+          chore.nextAvailableAt = Date.now() + REPEAT_INTERVALS[interval];
+          saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
+        }
         delete state.claims[claimId];
         saveToFirebase('claims/' + claimId, null);
       }
@@ -1900,9 +1907,14 @@ function approveChore(claimId) {
   saveToFirebase('claims/' + claimId, claim);
   // Reset repeating chores with interval cooldown
   const interval = chore.repeatInterval || (chore.repeating ? 'daily' : null);
-  if (interval && REPEAT_INTERVALS[interval]) {
-    chore.nextAvailableAt = Date.now() + REPEAT_INTERVALS[interval];
-    saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
+  if (interval !== null && interval in REPEAT_INTERVALS) {
+    if (interval === 'instant') {
+      chore.nextAvailableAt = null;
+      saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', null);
+    } else {
+      chore.nextAvailableAt = Date.now() + REPEAT_INTERVALS[interval];
+      saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
+    }
     delete state.claims[claimId];
     saveToFirebase('claims/' + claimId, null);
   }
@@ -2172,7 +2184,7 @@ let choreSelIcon = 'broom';
 let choreRepeatInterval = ''; // '' = never, 'daily', 'weekly', 'monthly'
 let choreAssignedTo = null; // null = anyone
 
-const REPEAT_INTERVALS = { daily: 86400000, weekly: 604800000, monthly: 2592000000 };
+const REPEAT_INTERVALS = { instant: 0, daily: 86400000, weekly: 604800000, monthly: 2592000000 };
 
 function formatResetTime(nextAvailableAt) {
   const ms = nextAvailableAt - Date.now();
