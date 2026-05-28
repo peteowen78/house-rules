@@ -1497,8 +1497,8 @@ let db = null;
 try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.database();
-  // Sign in anonymously so database rules can require auth != null
   firebase.auth().signInAnonymously().catch(e => console.warn('Auth error', e));
+  // onAuthStateChanged at the bottom waits for this before calling initApp()
 } catch(e) { console.warn('Firebase unavailable', e); }
 
 // ── Family management ────────────────────────────────────────────────────────
@@ -2457,7 +2457,12 @@ document.getElementById('setup-join-btn').addEventListener('click', () => {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-initApp();
+// Wait for anonymous auth to complete before loading any Firebase data
+firebase.auth().onAuthStateChanged(user => {
+  if (user) {
+    initApp();
+  }
+});
 </script>
 </body>
 </html>
