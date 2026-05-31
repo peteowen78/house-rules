@@ -327,6 +327,51 @@
       color: var(--muted);
     }
     .chore-card.taken { opacity: 0.45; pointer-events: none; cursor: default; }
+    /* Compulsory chore states */
+    .chore-card.compulsory { border-left: 4px solid #000; }
+    .chore-card.compulsory.urgent { border-left: 4px solid var(--yellow); background: var(--yellow); color: #000; }
+    .chore-card.compulsory.urgent .chore-pts { color: #000; opacity: 0.6; }
+    .chore-card.compulsory.urgent .chore-emoji { color: #000; }
+    .chore-card.compulsory.overdue { background: #000; border-color: #000; color: #fff; cursor: default; pointer-events: none; }
+    .chore-card.compulsory.overdue .chore-pts { color: #888; }
+    .chore-card.compulsory.overdue .chore-emoji { color: #fff; }
+    .chore-deadline-badge {
+      margin-top: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .chore-card.compulsory .chore-deadline-badge { color: var(--muted); }
+    .chore-card.compulsory.urgent .chore-deadline-badge { color: #000; }
+    .chore-card.compulsory.overdue .chore-deadline-badge { color: var(--yellow); }
+    .due-within-picker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1px;
+      background: var(--border);
+      margin-top: 10px;
+    }
+    .due-opt {
+      flex: 1;
+      min-width: calc(33.33% - 1px);
+      padding: 10px 6px;
+      border: none;
+      background: var(--surface);
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      text-align: center;
+      transition: background 0.1s, color 0.1s;
+    }
+    .due-opt.active { background: #000; color: var(--yellow); }
     .chore-done-badge {
       margin-top: auto;
       display: inline-flex;
@@ -1422,6 +1467,24 @@
         <label>Assign to</label>
         <div class="assign-picker" id="chore-assign-picker"></div>
       </div>
+      <div class="toggle-row" style="margin-top:14px">
+        <div>
+          <div class="toggle-label"><i class="ph-bold ph-warning"></i> Compulsory</div>
+          <div class="toggle-sub">Must be completed within a set time</div>
+        </div>
+        <div class="toggle" id="chore-compulsory-toggle"></div>
+      </div>
+      <div id="chore-due-within-wrap" style="display:none;margin-top:12px">
+        <label class="field-label">Complete within</label>
+        <div class="due-within-picker" id="chore-due-picker">
+          <button type="button" class="due-opt" data-hours="1">1 hour</button>
+          <button type="button" class="due-opt" data-hours="2">2 hours</button>
+          <button type="button" class="due-opt" data-hours="4">4 hours</button>
+          <button type="button" class="due-opt active" data-hours="8">8 hours</button>
+          <button type="button" class="due-opt" data-hours="24">24 hours</button>
+          <button type="button" class="due-opt" data-hours="48">2 days</button>
+        </div>
+      </div>
       <div class="modal-actions">
         <button class="btn-cancel" id="chore-modal-cancel">Cancel</button>
         <button class="btn-save" id="chore-modal-save">Save</button>
@@ -1680,9 +1743,20 @@ function renderChoreboard(kidId) {
     const done = myDoneBychore[id];
     const taken = takenByOther.has(id);
     const cooling = ch.nextAvailableAt && Date.now() < ch.nextAvailableAt;
+    const isCompulsory = !!ch.compulsory;
+    const urgency = isCompulsory && ch.dueBy ? choreUrgency(ch.dueBy) : '';
+    const compulsoryClass = isCompulsory ? ' compulsory' + (urgency ? ' ' + urgency : '') : '';
 
     let stateClass = 'available';
     let extra = '';
+
+    // Deadline badge for compulsory chores (shown alongside other states)
+    let deadlineBadge = '';
+    if (isCompulsory && ch.dueBy && !cooling && !done) {
+      const label = urgency === 'overdue' ? 'Overdue' : formatDeadline(ch.dueBy);
+      const icon = urgency === 'overdue' ? 'ph-warning' : 'ph-timer';
+      deadlineBadge = `<span class="chore-deadline-badge"><i class="ph-bold ${icon}"></i> ${label}</span>`;
+    }
 
     if (cooling) {
       stateClass = 'cooling';
@@ -1702,13 +1776,13 @@ function renderChoreboard(kidId) {
     }
 
     return `
-      <div class="chore-card ${stateClass}" data-chore="${id}" data-kid="${kidId}">
+      <div class="chore-card ${stateClass}${compulsoryClass}" data-chore="${id}" data-kid="${kidId}">
         <div class="chore-emoji">${renderIcon(ch.emoji)}</div>
         <div class="chore-info">
           <div class="chore-title">${esc(ch.title)}</div>
           <div class="chore-pts"><i class="ph-bold ph-star"></i> ${ch.points} pts</div>
         </div>
-        ${extra}
+        ${deadlineBadge || extra}
       </div>
     `;
   }).join('');
@@ -1778,12 +1852,17 @@ function markChoreDone(claimId, kidId) {
       const interval = chore.repeatInterval || (chore.repeating ? 'daily' : null);
       if (interval !== null && interval in REPEAT_INTERVALS) {
         if (interval === 'instant') {
-          // Reset immediately — clear any previous cooldown too
           chore.nextAvailableAt = null;
           saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', null);
         } else {
           chore.nextAvailableAt = Date.now() + REPEAT_INTERVALS[interval];
           saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
+        }
+        // Reset compulsory deadline for next cycle
+        if (chore.compulsory && chore.dueWithinHours) {
+          const cooldown = interval === 'instant' ? 0 : REPEAT_INTERVALS[interval];
+          chore.dueBy = Date.now() + cooldown + chore.dueWithinHours * 3600000;
+          saveToFirebase('chores/' + claim.choreId + '/dueBy', chore.dueBy);
         }
         delete state.claims[claimId];
         saveToFirebase('claims/' + claimId, null);
@@ -1914,6 +1993,12 @@ function approveChore(claimId) {
     } else {
       chore.nextAvailableAt = Date.now() + REPEAT_INTERVALS[interval];
       saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
+    }
+    // Reset compulsory deadline for next cycle
+    if (chore.compulsory && chore.dueWithinHours) {
+      const cooldown = interval === 'instant' ? 0 : REPEAT_INTERVALS[interval];
+      chore.dueBy = Date.now() + cooldown + chore.dueWithinHours * 3600000;
+      saveToFirebase('chores/' + claim.choreId + '/dueBy', chore.dueBy);
     }
     delete state.claims[claimId];
     saveToFirebase('claims/' + claimId, null);
@@ -2183,6 +2268,25 @@ let editingChoreId = null;
 let choreSelIcon = 'broom';
 let choreRepeatInterval = ''; // '' = never, 'daily', 'weekly', 'monthly'
 let choreAssignedTo = null; // null = anyone
+let choreCompulsory = false;
+let choreDueWithinHours = 8;
+
+function formatDeadline(dueBy) {
+  const ms = dueBy - Date.now();
+  if (ms <= 0) return 'Overdue';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h >= 48) return Math.floor(h / 24) + 'd left';
+  if (h >= 1) return h + 'h ' + m + 'm left';
+  return m + 'm left';
+}
+
+function choreUrgency(dueBy) {
+  const ms = dueBy - Date.now();
+  if (ms <= 0) return 'overdue';
+  if (ms < 2 * 3600000) return 'urgent';
+  return '';
+}
 
 const REPEAT_INTERVALS = { instant: 0, daily: 86400000, weekly: 604800000, monthly: 2592000000 };
 
@@ -2228,14 +2332,34 @@ function openChoreModal(choreId) {
   document.getElementById('chore-inp-pts').value = ch ? ch.points : '';
   choreRepeatInterval = ch ? (ch.repeatInterval || (ch.repeating ? 'daily' : '')) : '';
   choreAssignedTo = ch ? (ch.assignedTo || null) : null;
+  choreCompulsory = ch ? !!ch.compulsory : false;
+  choreDueWithinHours = ch ? (ch.dueWithinHours || 8) : 8;
   document.querySelectorAll('#chore-repeat-picker .repeat-opt').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.interval === choreRepeatInterval);
+  });
+  document.getElementById('chore-compulsory-toggle').className = 'toggle' + (choreCompulsory ? ' on' : '');
+  document.getElementById('chore-due-within-wrap').style.display = choreCompulsory ? '' : 'none';
+  document.querySelectorAll('#chore-due-picker .due-opt').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.hours) === choreDueWithinHours);
   });
   buildIconPicker('chore-icon-grid', choreSelIcon, CHORE_ICONS, v => { choreSelIcon = v; });
   buildAssignPicker();
   document.getElementById('modal-chore').classList.add('open');
 }
 
+document.getElementById('chore-compulsory-toggle').addEventListener('click', () => {
+  choreCompulsory = !choreCompulsory;
+  document.getElementById('chore-compulsory-toggle').className = 'toggle' + (choreCompulsory ? ' on' : '');
+  document.getElementById('chore-due-within-wrap').style.display = choreCompulsory ? '' : 'none';
+});
+document.getElementById('chore-due-picker').addEventListener('click', e => {
+  const btn = e.target.closest('.due-opt');
+  if (!btn) return;
+  choreDueWithinHours = parseInt(btn.dataset.hours);
+  document.querySelectorAll('#chore-due-picker .due-opt').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.hours) === choreDueWithinHours)
+  );
+});
 document.getElementById('chore-repeat-picker').addEventListener('click', e => {
   const btn = e.target.closest('.repeat-opt');
   if (!btn) return;
@@ -2253,7 +2377,15 @@ document.getElementById('chore-modal-save').addEventListener('click', () => {
   const emoji = choreSelIcon || 'broom';
   const points = parseInt(document.getElementById('chore-inp-pts').value, 10);
   if (!title || !(points > 0)) { toast('Fill in all fields'); return; }
-  const data = { title, emoji, points, repeatInterval: choreRepeatInterval || null, assignedTo: choreAssignedTo || null };
+  const dueBy = choreCompulsory ? Date.now() + choreDueWithinHours * 3600000 : null;
+  const data = {
+    title, emoji, points,
+    repeatInterval: choreRepeatInterval || null,
+    assignedTo: choreAssignedTo || null,
+    compulsory: choreCompulsory || null,
+    dueWithinHours: choreCompulsory ? choreDueWithinHours : null,
+    dueBy: choreCompulsory ? (editingChoreId ? (state.chores[editingChoreId]?.dueBy || dueBy) : dueBy) : null
+  };
   if (editingChoreId) {
     state.chores[editingChoreId] = { ...state.chores[editingChoreId], ...data };
     saveToFirebase('chores/' + editingChoreId, state.chores[editingChoreId]);
