@@ -315,8 +315,8 @@
       background: var(--surface);
     }
     .chore-card.cooling .chore-title { text-decoration: line-through; }
+    .chore-card-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; width: 100%; }
     .chore-reset-badge {
-      margin-top: auto;
       display: inline-flex;
       align-items: center;
       gap: 5px;
@@ -336,7 +336,6 @@
     .chore-card.compulsory.overdue .chore-pts { color: #888; }
     .chore-card.compulsory.overdue .chore-emoji { color: #fff; }
     .chore-deadline-badge {
-      margin-top: auto;
       display: inline-flex;
       align-items: center;
       gap: 5px;
@@ -348,32 +347,7 @@
     .chore-card.compulsory .chore-deadline-badge { color: var(--muted); }
     .chore-card.compulsory.urgent .chore-deadline-badge { color: #000; }
     .chore-card.compulsory.overdue .chore-deadline-badge { color: var(--yellow); }
-    .due-within-picker {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1px;
-      background: var(--border);
-      margin-top: 10px;
-    }
-    .due-opt {
-      flex: 1;
-      min-width: calc(33.33% - 1px);
-      padding: 10px 6px;
-      border: none;
-      background: var(--surface);
-      color: var(--muted);
-      font-family: var(--font);
-      font-size: 0.68rem;
-      font-weight: 600;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      text-align: center;
-      transition: background 0.1s, color 0.1s;
-    }
-    .due-opt.active { background: #000; color: var(--yellow); }
     .chore-done-badge {
-      margin-top: auto;
       display: inline-flex;
       align-items: center;
       gap: 5px;
@@ -384,7 +358,6 @@
       color: var(--success);
     }
     .chore-taken-badge {
-      margin-top: auto;
       font-size: 0.6rem;
       font-weight: 700;
       letter-spacing: 0.1em;
@@ -403,7 +376,6 @@
       padding: 5px 8px;
       border-radius: 0;
       white-space: nowrap;
-      margin-top: auto;
     }
     .badge-inprogress { background: var(--yellow); color: #000; border: none; }
     .badge-pending { background: var(--yellow); color: #000; border: none; }
@@ -421,7 +393,6 @@
       transition: opacity 0.1s;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      margin-top: auto;
       width: 100%;
     }
     .btn-done:active { opacity: 0.7; }
@@ -941,6 +912,21 @@
       letter-spacing: 0.1em;
       text-transform: uppercase;
     }
+    .btn-cancel-redemption {
+      padding: 9px 12px;
+      border-radius: 0;
+      border: 1px solid var(--border-hi);
+      background: none;
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
 
     /* ── Assign picker ── */
     .assign-picker {
@@ -1290,7 +1276,7 @@
     <div id="kids-grid" class="kids-grid"></div>
     <div id="home-empty" class="home-empty" style="display:none">
       <div class="big-emoji">🏠</div>
-      <h2>No Champions yet!</h2>
+      <h2>No family members yet!</h2>
       <p>Tap the <strong>🔒</strong> button to set up your family, add kids, chores and prizes.</p>
     </div>
     <button class="parent-fab" id="parent-fab-btn" aria-label="Parent mode">
@@ -1470,20 +1456,9 @@
       <div class="toggle-row" style="margin-top:14px">
         <div>
           <div class="toggle-label"><i class="ph-bold ph-warning"></i> Compulsory</div>
-          <div class="toggle-sub">Must be completed within a set time</div>
+          <div class="toggle-sub">Due by end of the repeat period (e.g. Mon 1am for weekly)</div>
         </div>
         <div class="toggle" id="chore-compulsory-toggle"></div>
-      </div>
-      <div id="chore-due-within-wrap" style="display:none;margin-top:12px">
-        <label class="field-label">Complete within</label>
-        <div class="due-within-picker" id="chore-due-picker">
-          <button type="button" class="due-opt" data-hours="1">1 hour</button>
-          <button type="button" class="due-opt" data-hours="2">2 hours</button>
-          <button type="button" class="due-opt" data-hours="4">4 hours</button>
-          <button type="button" class="due-opt active" data-hours="8">8 hours</button>
-          <button type="button" class="due-opt" data-hours="24">24 hours</button>
-          <button type="button" class="due-opt" data-hours="48">2 days</button>
-        </div>
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" id="chore-modal-cancel">Cancel</button>
@@ -1517,7 +1492,7 @@
         <div class="toggle" id="prize-cash-toggle"></div>
       </div>
       <div class="field" id="prize-cash-field" style="display:none;margin-top:12px">
-        <label>Cash amount ($)</label>
+        <label>Cash amount</label>
         <input type="number" id="prize-inp-cash" placeholder="5.00" min="0" step="0.50" inputmode="decimal" />
       </div>
       <div class="modal-actions">
@@ -1782,7 +1757,7 @@ function renderChoreboard(kidId) {
           <div class="chore-title">${esc(ch.title)}</div>
           <div class="chore-pts"><i class="ph-bold ph-star"></i> ${ch.points} pts</div>
         </div>
-        ${deadlineBadge || extra}
+        <div class="chore-card-footer">${deadlineBadge}${extra}</div>
       </div>
     `;
   }).join('');
@@ -1806,7 +1781,7 @@ function renderPrizeShop(kidId) {
   const pts = kid ? (kid.points || 0) : 0;
   grid.innerHTML = prizes.map(([id, p]) => {
     const canAfford = pts >= p.points;
-    const costLabel = p.isCash ? `<i class="ph-bold ph-currency-dollar"></i> $${Number(p.cashAmount).toFixed(2)} · ${p.points} pts` : `<i class="ph-bold ph-star"></i> ${p.points}`;
+    const costLabel = p.isCash ? `<i class="ph-bold ph-currency-dollar"></i> ${Number(p.cashAmount).toFixed(2)} · ${p.points} pts` : `<i class="ph-bold ph-star"></i> ${p.points}`;
     const needed = p.points - pts;
     return `
       <div class="prize-card ${canAfford ? 'affordable' : ''}">
@@ -1859,9 +1834,8 @@ function markChoreDone(claimId, kidId) {
           saveToFirebase('chores/' + claim.choreId + '/nextAvailableAt', chore.nextAvailableAt);
         }
         // Reset compulsory deadline for next cycle
-        if (chore.compulsory && chore.dueWithinHours) {
-          const cooldown = interval === 'instant' ? 0 : REPEAT_INTERVALS[interval];
-          chore.dueBy = Date.now() + cooldown + chore.dueWithinHours * 3600000;
+        if (chore.compulsory) {
+          chore.dueBy = computeDueBy(interval);
           saveToFirebase('chores/' + claim.choreId + '/dueBy', chore.dueBy);
         }
         delete state.claims[claimId];
@@ -1956,9 +1930,12 @@ function renderApprovalsTab() {
         <div style="font-size:1.8rem">${esc(prize.emoji)}</div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:0.95rem">${esc(prize.title)}</div>
-          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${renderIcon(kid.avatar, `color:${kid.color}`)} ${esc(kid.name)} · ${timeAgo(r.redeemedAt)}${prize.isCash ? ' · <i class="ph-bold ph-currency-dollar"></i> $' + Number(prize.cashAmount).toFixed(2) : ''}</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${renderIcon(kid.avatar, `color:${kid.color}`)} ${esc(kid.name)} · ${timeAgo(r.redeemedAt)}${prize.isCash ? ' · <i class="ph-bold ph-currency-dollar"></i> ' + Number(prize.cashAmount).toFixed(2) : ''}</div>
         </div>
-        <button class="btn-fulfill" data-redemption="${id}"><i class="ph-bold ph-check"></i> Fulfilled</button>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn-fulfill" data-redemption="${id}"><i class="ph-bold ph-check"></i> Fulfilled</button>
+          <button class="btn-cancel-redemption" data-redemption="${id}"><i class="ph-bold ph-x"></i></button>
+        </div>
       </div>
     `;
   }).join('') : '';
@@ -1971,6 +1948,9 @@ function renderApprovalsTab() {
   });
   redeemList.querySelectorAll('.btn-fulfill').forEach(btn => {
     btn.addEventListener('click', () => fulfillRedemption(btn.dataset.redemption));
+  });
+  redeemList.querySelectorAll('.btn-cancel-redemption').forEach(btn => {
+    btn.addEventListener('click', () => rejectRedemption(btn.dataset.redemption));
   });
 }
 
@@ -2012,11 +1992,12 @@ function approveChore(claimId) {
 function rejectChore(claimId) {
   const claim = state.claims[claimId];
   if (!claim) return;
-  claim.status = 'rejected';
-  saveToFirebase('claims/' + claimId, claim);
+  const kid = state.kids[claim.kidId];
+  delete state.claims[claimId];
+  saveToFirebase('claims/' + claimId, null);
   if (activeKidId === claim.kidId) renderKidView(activeKidId);
   renderParent();
-  toast('Chore rejected — sent back');
+  toast('Sent back — ' + (kid?.name || 'them') + ' can try again');
 }
 
 function fulfillRedemption(redemptionId) {
@@ -2025,7 +2006,23 @@ function fulfillRedemption(redemptionId) {
   r.status = 'fulfilled';
   saveToFirebase('redemptions/' + redemptionId, r);
   renderParent();
-  toast('✅ Prize fulfilled!');
+  toast('Prize fulfilled!');
+}
+
+function rejectRedemption(redemptionId) {
+  const r = state.redemptions[redemptionId];
+  if (!r) return;
+  const kid = state.kids[r.kidId];
+  if (kid) {
+    kid.points = (kid.points || 0) + (r.pointsCost || 0);
+    saveToFirebase('kids/' + r.kidId + '/points', kid.points);
+  }
+  delete state.redemptions[redemptionId];
+  saveToFirebase('redemptions/' + redemptionId, null);
+  renderParent();
+  renderHome();
+  if (activeKidId === r.kidId) renderKidView(activeKidId);
+  toast('Prize cancelled — points refunded to ' + (kid?.name || 'them'));
 }
 
 function renderKidsMgmt() {
@@ -2100,7 +2097,7 @@ function renderPrizesMgmt() {
       <div class="mgmt-emoji">${renderIcon(p.emoji)}</div>
       <div class="mgmt-info">
         <div class="mgmt-name">${esc(p.title)}</div>
-        <div class="mgmt-sub"><i class="ph-bold ph-star"></i> ${p.points}${p.isCash ? ' · <i class="ph-bold ph-currency-dollar"></i> $' + Number(p.cashAmount).toFixed(2) : ''}</div>
+        <div class="mgmt-sub"><i class="ph-bold ph-star"></i> ${p.points}${p.isCash ? ' · <i class="ph-bold ph-currency-dollar"></i> ' + Number(p.cashAmount).toFixed(2) : ''}</div>
       </div>
       <div class="mgmt-actions">
         <button class="icon-btn" data-edit-prize="${id}"><i class="ph-bold ph-pencil-simple"></i></button>
@@ -2258,6 +2255,12 @@ document.getElementById('kid-modal-save').addEventListener('click', () => {
 });
 
 function deleteKid(id) {
+  Object.entries(state.claims).forEach(([claimId, c]) => {
+    if (c.kidId === id) { delete state.claims[claimId]; saveToFirebase('claims/' + claimId, null); }
+  });
+  Object.entries(state.redemptions).forEach(([rId, r]) => {
+    if (r.kidId === id) { delete state.redemptions[rId]; saveToFirebase('redemptions/' + rId, null); }
+  });
   delete state.kids[id];
   saveToFirebase('kids/' + id, null);
   renderAll();
@@ -2269,7 +2272,37 @@ let choreSelIcon = 'broom';
 let choreRepeatInterval = ''; // '' = never, 'daily', 'weekly', 'monthly'
 let choreAssignedTo = null; // null = anyone
 let choreCompulsory = false;
-let choreDueWithinHours = 8;
+
+function computeDueBy(repeatInterval) {
+  if (!repeatInterval || repeatInterval === 'instant') return null;
+  const now = new Date();
+  if (repeatInterval === 'daily') {
+    const d = new Date(now);
+    if (d.getHours() >= 1) d.setDate(d.getDate() + 1);
+    d.setHours(1, 0, 0, 0);
+    return d.getTime();
+  }
+  if (repeatInterval === 'weekly') {
+    const d = new Date(now);
+    const day = d.getDay();
+    const isEarlyMonday = day === 1 && d.getHours() < 1;
+    if (isEarlyMonday) {
+      d.setHours(1, 0, 0, 0);
+    } else {
+      d.setDate(d.getDate() + (day === 0 ? 1 : 8 - day));
+      d.setHours(1, 0, 0, 0);
+    }
+    return d.getTime();
+  }
+  if (repeatInterval === 'monthly') {
+    const d = new Date(now);
+    const isFirstEarly = d.getDate() === 1 && d.getHours() < 1;
+    if (!isFirstEarly) d.setMonth(d.getMonth() + 1, 1);
+    d.setHours(1, 0, 0, 0);
+    return d.getTime();
+  }
+  return null;
+}
 
 function formatDeadline(dueBy) {
   const ms = dueBy - Date.now();
@@ -2333,15 +2366,10 @@ function openChoreModal(choreId) {
   choreRepeatInterval = ch ? (ch.repeatInterval || (ch.repeating ? 'daily' : '')) : '';
   choreAssignedTo = ch ? (ch.assignedTo || null) : null;
   choreCompulsory = ch ? !!ch.compulsory : false;
-  choreDueWithinHours = ch ? (ch.dueWithinHours || 8) : 8;
   document.querySelectorAll('#chore-repeat-picker .repeat-opt').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.interval === choreRepeatInterval);
   });
   document.getElementById('chore-compulsory-toggle').className = 'toggle' + (choreCompulsory ? ' on' : '');
-  document.getElementById('chore-due-within-wrap').style.display = choreCompulsory ? '' : 'none';
-  document.querySelectorAll('#chore-due-picker .due-opt').forEach(btn => {
-    btn.classList.toggle('active', parseInt(btn.dataset.hours) === choreDueWithinHours);
-  });
   buildIconPicker('chore-icon-grid', choreSelIcon, CHORE_ICONS, v => { choreSelIcon = v; });
   buildAssignPicker();
   document.getElementById('modal-chore').classList.add('open');
@@ -2350,15 +2378,6 @@ function openChoreModal(choreId) {
 document.getElementById('chore-compulsory-toggle').addEventListener('click', () => {
   choreCompulsory = !choreCompulsory;
   document.getElementById('chore-compulsory-toggle').className = 'toggle' + (choreCompulsory ? ' on' : '');
-  document.getElementById('chore-due-within-wrap').style.display = choreCompulsory ? '' : 'none';
-});
-document.getElementById('chore-due-picker').addEventListener('click', e => {
-  const btn = e.target.closest('.due-opt');
-  if (!btn) return;
-  choreDueWithinHours = parseInt(btn.dataset.hours);
-  document.querySelectorAll('#chore-due-picker .due-opt').forEach(b =>
-    b.classList.toggle('active', parseInt(b.dataset.hours) === choreDueWithinHours)
-  );
 });
 document.getElementById('chore-repeat-picker').addEventListener('click', e => {
   const btn = e.target.closest('.repeat-opt');
@@ -2377,14 +2396,13 @@ document.getElementById('chore-modal-save').addEventListener('click', () => {
   const emoji = choreSelIcon || 'broom';
   const points = parseInt(document.getElementById('chore-inp-pts').value, 10);
   if (!title || !(points > 0)) { toast('Fill in all fields'); return; }
-  const dueBy = choreCompulsory ? Date.now() + choreDueWithinHours * 3600000 : null;
+  const dueBy = choreCompulsory ? (editingChoreId ? (state.chores[editingChoreId]?.dueBy || computeDueBy(choreRepeatInterval)) : computeDueBy(choreRepeatInterval)) : null;
   const data = {
     title, emoji, points,
     repeatInterval: choreRepeatInterval || null,
     assignedTo: choreAssignedTo || null,
     compulsory: choreCompulsory || null,
-    dueWithinHours: choreCompulsory ? choreDueWithinHours : null,
-    dueBy: choreCompulsory ? (editingChoreId ? (state.chores[editingChoreId]?.dueBy || dueBy) : dueBy) : null
+    dueBy
   };
   if (editingChoreId) {
     state.chores[editingChoreId] = { ...state.chores[editingChoreId], ...data };
@@ -2400,6 +2418,9 @@ document.getElementById('chore-modal-save').addEventListener('click', () => {
 });
 
 function deleteChore(id) {
+  Object.entries(state.claims).forEach(([claimId, c]) => {
+    if (c.choreId === id) { delete state.claims[claimId]; saveToFirebase('claims/' + claimId, null); }
+  });
   delete state.chores[id];
   saveToFirebase('chores/' + id, null);
   renderAll();
@@ -2525,7 +2546,7 @@ function launchConfetti() {
     vx: (Math.random() - 0.5) * 6,
     vy: Math.random() * 4 + 2,
     r: Math.random() * 7 + 3,
-    color: ['#fbbf24','#f472b6','#a78bfa','#34d399','#38bdf8','#fb923c'][Math.floor(Math.random() * 6)],
+    color: ['#FDE934','#FDE934','#FDE934','#000000','#ffffff','#FDE934'][Math.floor(Math.random() * 6)],
     rot: Math.random() * Math.PI * 2,
     rotV: (Math.random() - 0.5) * 0.2
   }));
@@ -2599,6 +2620,9 @@ document.getElementById('setup-join-btn').addEventListener('click', () => {
     loadFromFirebase();
   });
 });
+
+// ── Live deadline timer ───────────────────────────────────────────────────────
+setInterval(() => { if (activeKidId) renderChoreboard(activeKidId); }, 60000);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 // Wait for anonymous auth to complete before loading any Firebase data
