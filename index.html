@@ -1268,11 +1268,11 @@
           <input type="text" id="setup-join-code" placeholder="e.g. XK3M9Z" maxlength="6" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:0.15em;font-size:1.2rem" />
         </div>
         <div class="field">
-          <label>Email</label>
+          <label>Email <span style="text-transform:none;letter-spacing:0;font-weight:500">(optional — kids can skip this)</span></label>
           <input type="email" id="setup-join-email" placeholder="you@example.com" autocomplete="email" />
         </div>
         <div class="field">
-          <label>Password</label>
+          <label>Password <span style="text-transform:none;letter-spacing:0;font-weight:500">(only if email entered)</span></label>
           <input type="password" id="setup-join-pass" placeholder="6+ characters" autocomplete="new-password" />
         </div>
         <button class="setup-btn" id="setup-join-btn">Join family →</button>
@@ -2728,15 +2728,18 @@ document.getElementById('setup-join-btn').addEventListener('click', () => {
   const email = document.getElementById('setup-join-email').value.trim();
   const pass = document.getElementById('setup-join-pass').value;
   if (code.length !== 6) { toast('Enter the 6-character family code'); return; }
-  if (!email || !pass) { toast('Enter an email and password'); return; }
+  if (email && !pass) { toast('Enter a password for your email'); return; }
   suppressAuthHandler = true;
-  signInOrCreate(email, pass)
+  // Email is optional: kids join on the anonymous session, parents can add an
+  // email here (or later via Settings) to make the login recoverable
+  const authStep = email ? signInOrCreate(email, pass) : Promise.resolve();
+  authStep
     .then(() => db.ref('families/' + code).once('value'))
     .then(snap => {
       if (!snap.exists()) { toast('Family code not found — check and try again'); return; }
       appStarted = true;
       setFamily(code, snap.val().name || '');
-      linkUserToFamily(code);
+      if (email) linkUserToFamily(code);
       showScreen('home');
       loadFromFirebase();
     })
