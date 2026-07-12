@@ -1243,26 +1243,55 @@
     <!-- CTA card -->
     <div class="setup-card">
       <div class="setup-tabs">
-        <button class="setup-tab active" id="setup-tab-create">Create family</button>
-        <button class="setup-tab" id="setup-tab-join">Join family</button>
+        <button class="setup-tab active" data-panel="create">Create</button>
+        <button class="setup-tab" data-panel="join">Join</button>
+        <button class="setup-tab" data-panel="login">Log in</button>
       </div>
-      <div id="setup-create-panel">
+      <div class="setup-panel" id="setup-create-panel">
         <div class="field">
           <label>Your surname</label>
           <input type="text" id="setup-surname" placeholder="e.g. Owen" autocomplete="off" autocapitalize="words" />
         </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="setup-create-email" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="setup-create-pass" placeholder="6+ characters" autocomplete="new-password" />
+        </div>
         <button class="setup-btn" id="setup-create-btn">Create family →</button>
       </div>
-      <div id="setup-join-panel" style="display:none">
+      <div class="setup-panel" id="setup-join-panel" style="display:none">
         <div class="field">
           <label>Family code</label>
           <input type="text" id="setup-join-code" placeholder="e.g. XK3M9Z" maxlength="6" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:0.15em;font-size:1.2rem" />
         </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="setup-join-email" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="setup-join-pass" placeholder="6+ characters" autocomplete="new-password" />
+        </div>
         <button class="setup-btn" id="setup-join-btn">Join family →</button>
+      </div>
+      <div class="setup-panel" id="setup-login-panel" style="display:none">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="setup-login-email" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="setup-login-pass" placeholder="Your password" autocomplete="current-password" />
+        </div>
+        <button class="setup-btn" id="setup-login-btn">Log in →</button>
+        <button type="button" id="setup-forgot-btn" style="display:block;margin:14px auto 0;background:none;border:none;color:var(--muted);font-family:var(--font);font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;text-decoration:underline">Forgot password?</button>
       </div>
     </div>
 
-    <div class="landing-footer">Free forever · No account needed · Works on any device</div>
+    <div class="landing-footer">Free forever · Works on any device · Log in from anywhere</div>
 
   </div><!-- /landing-inner -->
   </div>
@@ -1357,6 +1386,10 @@
           <div class="family-code-label"><i class="ph-bold ph-users"></i> Family code</div>
           <div class="family-code-value" id="family-code-display">——</div>
           <div class="family-code-hint">Share this code so other devices can join your family</div>
+        </div>
+        <div class="family-code-block">
+          <div class="family-code-label"><i class="ph-bold ph-envelope"></i> Account</div>
+          <div id="account-content"></div>
         </div>
       </div>
     </div>
@@ -1536,8 +1569,8 @@ let db = null;
 try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.database();
-  firebase.auth().signInAnonymously().catch(e => console.warn('Auth error', e));
-  // onAuthStateChanged at the bottom waits for this before calling initApp()
+  // Sign-in handled in onAuthStateChanged at the bottom:
+  // email users keep their session; everyone else falls back to anonymous
 } catch(e) { console.warn('Firebase unavailable', e); }
 
 // ── Family management ────────────────────────────────────────────────────────
@@ -1555,6 +1588,31 @@ function dbRef(path) {
   if (!db || !familyId) return null;
   const base = 'families/' + familyId;
   return db.ref(path ? base + '/' + path : base);
+}
+
+function setFamily(fid, name) {
+  familyId = fid;
+  if (name !== undefined) familyName = name;
+  localStorage.setItem('hrFamilyId', fid);
+  localStorage.setItem('hrFamilyName', familyName || '');
+}
+
+// Map the logged-in account to its family so any device can recover it
+function linkUserToFamily(fid) {
+  const u = firebase.auth().currentUser;
+  if (db && u && !u.isAnonymous) db.ref('users/' + u.uid + '/familyId').set(fid);
+}
+
+function authErrorMsg(e) {
+  const c = (e && e.code) || '';
+  if (c.includes('email-already-in-use')) return 'Email already registered — try logging in';
+  if (c.includes('invalid-email')) return "That email doesn't look right";
+  if (c.includes('weak-password')) return 'Password must be 6+ characters';
+  if (c.includes('wrong-password') || c.includes('invalid-credential') || c.includes('invalid-login-credentials')) return 'Wrong email or password';
+  if (c.includes('user-not-found')) return 'No account with that email';
+  if (c.includes('too-many-requests')) return 'Too many tries — wait a minute';
+  if (c.includes('operation-not-allowed')) return 'Email login not enabled yet';
+  return 'Something went wrong — try again';
 }
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -1875,7 +1933,54 @@ function renderParent() {
   renderKidsMgmt();
   renderChoresMgmt();
   renderPrizesMgmt();
+  renderAccountBlock();
   updateApprovalsBadge();
+}
+
+function renderAccountBlock() {
+  const el = document.getElementById('account-content');
+  if (!el) return;
+  const u = firebase.auth().currentUser;
+  if (u && !u.isAnonymous) {
+    el.innerHTML = `
+      <div class="family-code-value" style="font-size:0.95rem;letter-spacing:0.02em">${esc(u.email)}</div>
+      <div class="family-code-hint">Log in with this email on any device to recover your family</div>
+      <button class="setup-btn" id="sign-out-btn" style="margin-top:14px;background:none;border:1px solid var(--border-hi);color:var(--muted)">Log out</button>`;
+    document.getElementById('sign-out-btn').addEventListener('click', signOutAccount);
+  } else {
+    el.innerHTML = `
+      <div class="family-code-hint" style="margin-bottom:12px">Add an email and password so you can log back in if this device is ever reset or its cache cleared</div>
+      <div class="field"><input type="email" id="link-email" placeholder="Email" autocomplete="email" /></div>
+      <div class="field"><input type="password" id="link-pass" placeholder="Password (6+ characters)" autocomplete="new-password" /></div>
+      <button class="setup-btn" id="link-account-btn" style="margin-top:2px">Secure my family</button>`;
+    document.getElementById('link-account-btn').addEventListener('click', linkAccount);
+  }
+}
+
+// Attach email/password to the current anonymous session — keeps all family data
+function linkAccount() {
+  const email = document.getElementById('link-email').value.trim();
+  const pass = document.getElementById('link-pass').value;
+  if (!email || !pass) { toast('Enter an email and password'); return; }
+  const cred = firebase.auth.EmailAuthProvider.credential(email, pass);
+  suppressAuthHandler = true;
+  firebase.auth().currentUser.linkWithCredential(cred)
+    .then(() => {
+      linkUserToFamily(familyId);
+      renderAccountBlock();
+      toast('Account secured! 🔐');
+    })
+    .catch(e => toast(authErrorMsg(e)))
+    .finally(() => { suppressAuthHandler = false; });
+}
+
+function signOutAccount() {
+  if (db && familyId) dbRef('').off();
+  localStorage.removeItem('hrFamilyId');
+  localStorage.removeItem('hrFamilyName');
+  familyId = null;
+  familyName = '';
+  firebase.auth().signOut(); // auth handler signs in anonymously and shows setup
 }
 
 function updateApprovalsBadge() {
@@ -2580,54 +2685,121 @@ function timeAgo(ts) {
 }
 
 // ── Setup screen ─────────────────────────────────────────────────────────────
-document.getElementById('setup-tab-create').addEventListener('click', () => {
-  document.getElementById('setup-tab-create').classList.add('active');
-  document.getElementById('setup-tab-join').classList.remove('active');
-  document.getElementById('setup-create-panel').style.display = '';
-  document.getElementById('setup-join-panel').style.display = 'none';
+document.querySelectorAll('.setup-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.setup-tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.setup-panel').forEach(p => {
+      p.style.display = p.id === 'setup-' + tab.dataset.panel + '-panel' ? '' : 'none';
+    });
+  });
 });
-document.getElementById('setup-tab-join').addEventListener('click', () => {
-  document.getElementById('setup-tab-join').classList.add('active');
-  document.getElementById('setup-tab-create').classList.remove('active');
-  document.getElementById('setup-join-panel').style.display = '';
-  document.getElementById('setup-create-panel').style.display = 'none';
-});
+
+// Sign in with email, or create the account if it doesn't exist yet
+function signInOrCreate(email, pass) {
+  return firebase.auth().signInWithEmailAndPassword(email, pass)
+    .catch(e => {
+      if (e.code === 'auth/user-not-found') return firebase.auth().createUserWithEmailAndPassword(email, pass);
+      throw e;
+    });
+}
 
 document.getElementById('setup-create-btn').addEventListener('click', () => {
   const surname = document.getElementById('setup-surname').value.trim();
+  const email = document.getElementById('setup-create-email').value.trim();
+  const pass = document.getElementById('setup-create-pass').value;
   if (!surname) { toast('Enter your surname'); return; }
-  familyId   = generateFamilyCode();
-  familyName = surname;
-  localStorage.setItem('hrFamilyId',   familyId);
-  localStorage.setItem('hrFamilyName', familyName);
-  // Save family name to Firebase
-  dbRef('name').set(familyName);
-  showScreen('home');
-  loadFromFirebase();
+  if (!email || !pass) { toast('Enter an email and password'); return; }
+  suppressAuthHandler = true;
+  firebase.auth().createUserWithEmailAndPassword(email, pass)
+    .then(() => {
+      appStarted = true;
+      setFamily(generateFamilyCode(), surname);
+      dbRef('name').set(familyName);
+      linkUserToFamily(familyId);
+      showScreen('home');
+      loadFromFirebase();
+    })
+    .catch(e => toast(authErrorMsg(e)))
+    .finally(() => { suppressAuthHandler = false; });
 });
 
 document.getElementById('setup-join-btn').addEventListener('click', () => {
   const code = document.getElementById('setup-join-code').value.trim().toUpperCase();
+  const email = document.getElementById('setup-join-email').value.trim();
+  const pass = document.getElementById('setup-join-pass').value;
   if (code.length !== 6) { toast('Enter the 6-character family code'); return; }
-  // Check code exists in Firebase
-  db.ref('families/' + code).once('value', snap => {
-    if (!snap.exists()) { toast('Family code not found — check and try again'); return; }
-    familyId   = code;
-    familyName = snap.val().name || '';
-    localStorage.setItem('hrFamilyId',   familyId);
-    localStorage.setItem('hrFamilyName', familyName);
-    showScreen('home');
-    loadFromFirebase();
-  });
+  if (!email || !pass) { toast('Enter an email and password'); return; }
+  suppressAuthHandler = true;
+  signInOrCreate(email, pass)
+    .then(() => db.ref('families/' + code).once('value'))
+    .then(snap => {
+      if (!snap.exists()) { toast('Family code not found — check and try again'); return; }
+      appStarted = true;
+      setFamily(code, snap.val().name || '');
+      linkUserToFamily(code);
+      showScreen('home');
+      loadFromFirebase();
+    })
+    .catch(e => toast(authErrorMsg(e)))
+    .finally(() => { suppressAuthHandler = false; });
+});
+
+document.getElementById('setup-login-btn').addEventListener('click', () => {
+  const email = document.getElementById('setup-login-email').value.trim();
+  const pass = document.getElementById('setup-login-pass').value;
+  if (!email || !pass) { toast('Enter your email and password'); return; }
+  suppressAuthHandler = true;
+  firebase.auth().signInWithEmailAndPassword(email, pass)
+    .then(cred => db.ref('users/' + cred.user.uid + '/familyId').once('value'))
+    .then(snap => {
+      const fid = snap.val();
+      if (!fid) { toast('No family linked to this account yet'); return; }
+      return db.ref('families/' + fid + '/name').once('value').then(ns => {
+        appStarted = true;
+        setFamily(fid, ns.val() || '');
+        showScreen('home');
+        loadFromFirebase();
+      });
+    })
+    .catch(e => toast(authErrorMsg(e)))
+    .finally(() => { suppressAuthHandler = false; });
+});
+
+document.getElementById('setup-forgot-btn').addEventListener('click', () => {
+  const email = document.getElementById('setup-login-email').value.trim();
+  if (!email) { toast('Enter your email above first'); return; }
+  firebase.auth().sendPasswordResetEmail(email)
+    .then(() => toast('Reset email sent — check your inbox'))
+    .catch(e => toast(authErrorMsg(e)));
 });
 
 // ── Live deadline timer ───────────────────────────────────────────────────────
 setInterval(() => { if (activeKidId) renderChoreboard(activeKidId); }, 60000);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-// Wait for anonymous auth to complete before loading any Firebase data
+// Email users: recover their family from users/{uid}/familyId, so a cleared
+// cache or new device still finds their data. Everyone else: anonymous session.
+let suppressAuthHandler = false; // set during manual sign-in/create flows
+let appStarted = false;
+
 firebase.auth().onAuthStateChanged(user => {
-  if (user) {
+  if (suppressAuthHandler) return;
+  if (!user) {
+    appStarted = false;
+    firebase.auth().signInAnonymously().catch(e => console.warn('Auth error', e));
+    return;
+  }
+  if (appStarted) return;
+  appStarted = true;
+  if (!user.isAnonymous) {
+    db.ref('users/' + user.uid + '/familyId').once('value')
+      .then(snap => {
+        const fid = snap.val();
+        if (fid) setFamily(fid);
+        initApp();
+      })
+      .catch(() => initApp());
+  } else {
     initApp();
   }
 });
