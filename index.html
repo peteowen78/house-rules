@@ -2947,7 +2947,11 @@ document.getElementById('setup-forgot-btn').addEventListener('click', () => {
 });
 
 // ── Live deadline timer ───────────────────────────────────────────────────────
-setInterval(() => { if (activeKidId) renderChoreboard(activeKidId); }, 60000);
+setInterval(() => {
+  checkDeadlines();
+  if (activeKidId) renderChoreboard(activeKidId);
+  updateActivityBadges();
+}, 60000);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 // Email users: recover their family from users/{uid}/familyId, so a cleared
