@@ -2588,7 +2588,7 @@ function formatDeadline(dueBy) {
 function choreUrgency(dueBy) {
   const ms = dueBy - Date.now();
   if (ms <= 0) return 'overdue';
-  if (ms < 2 * 3600000) return 'urgent';
+  if (ms < 4 * 3600000) return 'urgent';
   return '';
 }
 
