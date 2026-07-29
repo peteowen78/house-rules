@@ -1714,6 +1714,7 @@ function loadFromFirebase() {
     document.title = title;
     const codeEl = document.getElementById('family-code-display');
     if (codeEl) codeEl.textContent = familyId;
+    checkDeadlines();
     renderAll();
   });
 }
