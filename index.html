@@ -1808,6 +1808,31 @@ function openActivityModal() {
   document.getElementById('modal-activity').classList.add('open');
 }
 
+// ── Deadline watch ──────────────────────────────────────────────────────────
+// Logs urgent/overdue compulsory chores to the activity feed once per cycle.
+// The urgentLogged/overdueLogged stamps hold the dueBy they were logged for,
+// so each new repeat cycle (new dueBy) re-arms the alerts automatically.
+function checkDeadlines() {
+  if (!db || !familyId) return;
+  Object.entries(state.chores).forEach(([id, ch]) => {
+    if (!ch.compulsory || !ch.dueBy) return;
+    if (ch.nextAvailableAt && Date.now() < ch.nextAvailableAt) return; // done, cooling down
+    const donePending = Object.values(state.claims).some(c => c.choreId === id && c.status === 'pending');
+    if (donePending) return; // finished, just waiting for approval
+    const who = ch.assignedTo && state.kids[ch.assignedTo] ? ' (' + state.kids[ch.assignedTo].name + ')' : '';
+    const u = choreUrgency(ch.dueBy);
+    if (u === 'urgent' && ch.urgentLogged !== ch.dueBy) {
+      ch.urgentLogged = ch.dueBy;
+      saveToFirebase('chores/' + id + '/urgentLogged', ch.dueBy);
+      logActivity('⚠️ "' + ch.title + '" due in ' + formatDeadline(ch.dueBy).replace(' left', '') + ' — still not done' + who, 'warning');
+    } else if (u === 'overdue' && ch.overdueLogged !== ch.dueBy) {
+      ch.overdueLogged = ch.dueBy;
+      saveToFirebase('chores/' + id + '/overdueLogged', ch.dueBy);
+      logActivity('🚨 "' + ch.title + '" is overdue' + who, 'warning');
+    }
+  });
+}
+
 // ── Home ────────────────────────────────────────────────────────────────────
 function renderHome() {
   const grid = document.getElementById('kids-grid');
