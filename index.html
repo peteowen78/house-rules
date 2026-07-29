@@ -2865,11 +2865,22 @@ document.querySelectorAll('.setup-tab').forEach(tab => {
   });
 });
 
-// Sign in with email, or create the account if it doesn't exist yet
+// Sign in with email, or create the account if it doesn't exist yet.
+// Firebase's email-enumeration protection reports a missing account as
+// "invalid-credential" rather than "user-not-found", so on either error we
+// attempt account creation; if the email actually exists, creation fails
+// with email-already-in-use and we surface the original wrong-password error.
 function signInOrCreate(email, pass) {
   return firebase.auth().signInWithEmailAndPassword(email, pass)
     .catch(e => {
-      if (e.code === 'auth/user-not-found') return firebase.auth().createUserWithEmailAndPassword(email, pass);
+      const c = (e && e.code) || '';
+      if (c.includes('user-not-found') || c.includes('invalid-credential') || c.includes('invalid-login-credentials')) {
+        return firebase.auth().createUserWithEmailAndPassword(email, pass)
+          .catch(e2 => {
+            if (((e2 && e2.code) || '').includes('email-already-in-use')) throw e;
+            throw e2;
+          });
+      }
       throw e;
     });
 }
