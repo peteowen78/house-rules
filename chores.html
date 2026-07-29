@@ -1005,6 +1005,52 @@
     }
     .repeat-opt.active { background: var(--yellow); color: #000; }
 
+    /* ── Activity feed ── */
+    .home-header { position: relative; }
+    .home-bell { position: absolute; top: 56px; right: 20px; }
+    .bell-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 0;
+      width: 36px;
+      height: 36px;
+      color: var(--text);
+      font-size: 1.05rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+      transition: background 0.1s;
+    }
+    .bell-btn:active { background: var(--surface); }
+    .activity-item {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .activity-icon { font-size: 1.15rem; color: var(--text); flex-shrink: 0; width: 24px; text-align: center; }
+    .activity-text { font-size: 0.85rem; line-height: 1.45; letter-spacing: -0.01em; }
+    .activity-time { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
+    .activity-share {
+      flex-shrink: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.05rem;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .activity-share:active { background: var(--yellow); }
+
     /* ── Phosphor icon alignment ── */
     i[class*="ph-"] { vertical-align: -0.13em; line-height: 1; }
     .icon-btn i[class*="ph-"] { font-size: 1rem; }
@@ -1301,6 +1347,10 @@
     <div class="home-header">
       <div class="home-title">House Rules</div>
       <div class="home-sub">Who's playing today?</div>
+      <button class="bell-btn home-bell" id="home-bell-btn" aria-label="Activity">
+        <i class="ph-bold ph-bell"></i>
+        <span class="approval-badge" id="home-bell-badge" style="display:none">0</span>
+      </button>
     </div>
     <div id="kids-grid" class="kids-grid"></div>
     <div id="home-empty" class="home-empty" style="display:none">
@@ -1323,6 +1373,10 @@
           <div class="kid-header-name" id="kid-view-name">—</div>
           <div class="kid-header-pts" id="kid-view-pts"><i class="ph-bold ph-star"></i> 0 points</div>
         </div>
+        <button class="bell-btn" id="kid-bell-btn" aria-label="Activity">
+          <i class="ph-bold ph-bell"></i>
+          <span class="approval-badge" id="kid-bell-badge" style="display:none">0</span>
+        </button>
         <div class="kid-header-avatar" id="kid-view-avatar">😊</div>
       </div>
       <div class="tabs">
@@ -1551,6 +1605,15 @@
     </div>
   </div>
 
+  <!-- ── ACTIVITY FEED MODAL ── -->
+  <div class="modal-overlay" id="modal-activity">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2><i class="ph-bold ph-bell"></i> Activity</h2>
+      <div id="activity-list"></div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
 <script>
@@ -1625,6 +1688,7 @@ let state = {
   claims:      {},  // {id: {choreId,kidId,status,claimedAt,completedAt}}
   prizes:      {},  // {id: {title,emoji,points,isCash,cashAmount}}
   redemptions: {},  // {id: {prizeId,kidId,status,redeemedAt,pointsCost}}
+  activity:    {},  // {id: {text,icon,ts}}
   settings:    { pin: '1234' }
 };
 
@@ -1642,6 +1706,7 @@ function loadFromFirebase() {
     state.claims      = val.claims      || {};
     state.prizes      = val.prizes      || {};
     state.redemptions = val.redemptions || {};
+    state.activity    = val.activity    || {};
     state.settings    = val.settings    || { pin: '1234' };
     // Update title + family code display
     const title = familyName ? familyName + ' House Rules' : 'House Rules';
@@ -1678,6 +1743,69 @@ function renderAll() {
   renderHome();
   renderParent();
   if (activeKidId) renderKidView(activeKidId);
+  updateActivityBadges();
+}
+
+// ── Activity feed & WhatsApp sharing ────────────────────────────────────────
+function logActivity(text, icon) {
+  if (!db || !familyId) return;
+  const id = uid();
+  const entry = { text, icon: icon || 'info', ts: Date.now() };
+  state.activity[id] = entry;
+  saveToFirebase('activity/' + id, entry);
+  // Keep only the latest 50 entries
+  Object.entries(state.activity)
+    .sort((a, b) => b[1].ts - a[1].ts)
+    .slice(50)
+    .forEach(([oldId]) => {
+      delete state.activity[oldId];
+      saveToFirebase('activity/' + oldId, null);
+    });
+}
+
+function waShare(text) {
+  const prefix = '🏠 ' + (familyName ? familyName + ' ' : '') + 'House Rules\n';
+  window.open('https://wa.me/?text=' + encodeURIComponent(prefix + text), '_blank');
+}
+
+function updateActivityBadges() {
+  const lastSeen = parseInt(localStorage.getItem('hrActivitySeen') || '0', 10);
+  const unread = Object.values(state.activity).filter(a => a.ts > lastSeen).length;
+  ['home-bell-badge', 'kid-bell-badge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = unread > 0 ? '' : 'none';
+    el.textContent = unread;
+  });
+}
+
+function renderActivityList() {
+  const list = document.getElementById('activity-list');
+  const items = Object.values(state.activity).sort((a, b) => b.ts - a.ts);
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty-mini" style="border-bottom:none"><div class="e">🔔</div>No activity yet — completed chores and prizes will show up here.</div>';
+    return;
+  }
+  list.innerHTML = items.map(it => `
+    <div class="activity-item">
+      <div class="activity-icon"><i class="ph-bold ph-${it.icon || 'info'}"></i></div>
+      <div style="flex:1;min-width:0">
+        <div class="activity-text">${esc(it.text)}</div>
+        <div class="activity-time">${timeAgo(it.ts)}</div>
+      </div>
+      <button class="activity-share" data-share="${esc(it.text)}" title="Share to WhatsApp" aria-label="Share to WhatsApp"><i class="ph-bold ph-whatsapp-logo"></i></button>
+    </div>
+  `).join('');
+  list.querySelectorAll('[data-share]').forEach(btn => {
+    btn.addEventListener('click', () => waShare(btn.dataset.share));
+  });
+}
+
+function openActivityModal() {
+  renderActivityList();
+  localStorage.setItem('hrActivitySeen', String(Date.now()));
+  updateActivityBadges();
+  document.getElementById('modal-activity').classList.add('open');
 }
 
 // ── Home ────────────────────────────────────────────────────────────────────
@@ -1882,6 +2010,7 @@ function markChoreDone(claimId, kidId) {
     if (chore) {
       member.points = (member.points || 0) + chore.points;
       saveToFirebase('kids/' + kidId + '/points', member.points);
+      logActivity(member.name + ' completed "' + chore.title + '" · +' + chore.points + ' pts', 'check-circle');
       const interval = chore.repeatInterval || (chore.repeating ? 'daily' : null);
       if (interval !== null && interval in REPEAT_INTERVALS) {
         if (interval === 'instant') {
@@ -1906,6 +2035,8 @@ function markChoreDone(claimId, kidId) {
   } else {
     claim.status = 'pending';
     saveToFirebase('claims/' + claimId, claim);
+    const chore = state.chores[claim.choreId];
+    if (chore && member) logActivity(member.name + ' finished "' + chore.title + '" — waiting for approval', 'clock');
     renderKidView(kidId);
     launchConfetti();
     toast('Nice work! Waiting for parent approval ⏳');
@@ -1922,6 +2053,7 @@ function redeemPrize(prizeId, kidId) {
   const redemption = { prizeId, kidId, status: 'pending', redeemedAt: Date.now(), pointsCost: prize.points };
   state.redemptions[id] = redemption;
   saveToFirebase('redemptions/' + id, redemption);
+  logActivity(kid.name + ' redeemed "' + prize.title + '" · ' + prize.points + ' pts', 'gift');
   renderKidView(kidId);
   launchConfetti();
   toast('Prize redeemed! 🎉 Parent will sort you out');
@@ -2021,6 +2153,7 @@ function renderApprovalsTab() {
         <div class="approval-btns">
           <button class="btn-approve" data-claim="${id}"><i class="ph-bold ph-check"></i> Approve</button>
           <button class="btn-reject" data-claim="${id}"><i class="ph-bold ph-x"></i> Reject</button>
+          <button class="btn-reject" style="flex:0 0 auto" data-wa="${esc(kid.name + ' finished “' + ch.title + '” ⭐ ' + ch.points + ' pts — waiting for approval')}" title="Share to WhatsApp" aria-label="Share to WhatsApp"><i class="ph-bold ph-whatsapp-logo"></i></button>
         </div>
       </div>
     `;
@@ -2048,8 +2181,11 @@ function renderApprovalsTab() {
   claimsList.querySelectorAll('.btn-approve').forEach(btn => {
     btn.addEventListener('click', () => approveChore(btn.dataset.claim));
   });
-  claimsList.querySelectorAll('.btn-reject').forEach(btn => {
+  claimsList.querySelectorAll('.btn-reject[data-claim]').forEach(btn => {
     btn.addEventListener('click', () => rejectChore(btn.dataset.claim));
+  });
+  claimsList.querySelectorAll('[data-wa]').forEach(btn => {
+    btn.addEventListener('click', () => waShare(btn.dataset.wa));
   });
   redeemList.querySelectorAll('.btn-fulfill').forEach(btn => {
     btn.addEventListener('click', () => fulfillRedemption(btn.dataset.redemption));
@@ -2069,6 +2205,7 @@ function approveChore(claimId) {
   saveToFirebase('kids/' + claim.kidId + '/points', kid.points);
   claim.status = 'approved';
   saveToFirebase('claims/' + claimId, claim);
+  logActivity(kid.name + ' completed "' + chore.title + '" · +' + chore.points + ' pts', 'check-circle');
   // Reset repeating chores with interval cooldown
   const interval = chore.repeatInterval || (chore.repeating ? 'daily' : null);
   if (interval !== null && interval in REPEAT_INTERVALS) {
@@ -2110,6 +2247,9 @@ function fulfillRedemption(redemptionId) {
   if (!r) return;
   r.status = 'fulfilled';
   saveToFirebase('redemptions/' + redemptionId, r);
+  const prize = state.prizes[r.prizeId];
+  const kid = state.kids[r.kidId];
+  if (prize && kid) logActivity('"' + prize.title + '" given to ' + kid.name, 'gift');
   renderParent();
   toast('Prize fulfilled!');
 }
@@ -2605,6 +2745,11 @@ document.getElementById('change-pin-save').addEventListener('click', () => {
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 document.getElementById('parent-fab-btn').addEventListener('click', () => openPinModal('verify'));
+document.getElementById('home-bell-btn').addEventListener('click', openActivityModal);
+document.getElementById('kid-bell-btn').addEventListener('click', openActivityModal);
+document.getElementById('modal-activity').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-activity')) document.getElementById('modal-activity').classList.remove('open');
+});
 document.getElementById('kid-back-btn').addEventListener('click', () => { activeKidId = null; showScreen('home'); });
 document.getElementById('parent-back-btn').addEventListener('click', () => showScreen('home'));
 
